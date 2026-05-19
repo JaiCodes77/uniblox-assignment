@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Cart, CartItem, Item
+from app.services.errors import NotFoundError
 
 
 class CartService:
@@ -33,7 +34,7 @@ class CartService:
 
         item = db.get(Item, item_id)
         if item is None:
-            raise ValueError(f"item {item_id} not found")
+            raise NotFoundError(f"item {item_id} not found")
 
         cart = CartService._get_or_create_cart(db, user_id)
 

@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import DiscountCode, Order, StoreConfig
+from app.services.errors import NotFoundError
 
 
 class DiscountService:
@@ -78,10 +79,13 @@ class DiscountService:
     @staticmethod
     def validate_code(db: Session, code: str) -> DiscountCode:
         """Return the DiscountCode row iff it exists and has not been used.
-        Raises ValueError otherwise."""
+
+        Raises ``NotFoundError`` if the code is unknown and ``ValueError``
+        if the code exists but is already used.
+        """
         record = db.get(DiscountCode, code)
         if record is None:
-            raise ValueError(f"discount code {code!r} not found")
+            raise NotFoundError(f"discount code {code!r} not found")
         if record.used:
             raise ValueError(f"discount code {code!r} already used")
         return record
@@ -90,7 +94,7 @@ class DiscountService:
     def mark_used(db: Session, code: str) -> None:
         record = db.get(DiscountCode, code)
         if record is None:
-            raise ValueError(f"discount code {code!r} not found")
+            raise NotFoundError(f"discount code {code!r} not found")
         record.used = True
         record.used_at = datetime.now()
         db.commit()
