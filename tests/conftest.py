@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import pytest
 from sqlalchemy import create_engine
@@ -15,7 +15,7 @@ from app.db import (
     SEED_ITEMS,
     Base,
 )
-from app.models import Item, StoreConfig
+from app.models import Item, Order, StoreConfig
 
 
 @pytest.fixture
@@ -61,3 +61,41 @@ def seed_items(db: Session) -> list[Item]:
     )
     db.commit()
     return db.query(Item).order_by(Item.id).all()
+
+
+@pytest.fixture
+def make_orders(db: Session) -> Callable[..., list[Order]]:
+    """Factory to insert dummy Order rows without going through the
+    (not-yet-implemented) checkout service.
+
+    Usage::
+
+        make_orders(3)                          # 3 orders @ $10 each
+        make_orders(2, subtotal=25.0)
+    """
+    counter = {"i": 0}
+
+    def _make(
+        n: int = 1,
+        *,
+        user_id: str = "tester",
+        subtotal: float = 10.0,
+        discount_amount: float = 0.0,
+        discount_code: str | None = None,
+    ) -> list[Order]:
+        created: list[Order] = []
+        for _ in range(n):
+            counter["i"] += 1
+            order = Order(
+                user_id=f"{user_id}-{counter['i']}",
+                subtotal=subtotal,
+                discount_amount=discount_amount,
+                discount_code=discount_code,
+                total=subtotal - discount_amount,
+            )
+            db.add(order)
+            created.append(order)
+        db.commit()
+        return created
+
+    return _make
