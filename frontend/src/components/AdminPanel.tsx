@@ -1,38 +1,30 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../api'
-import type { DiscountGenerateResult, Stats } from '../types'
+import { useAsyncData } from '../hooks/useAsyncData'
+import type { DiscountGenerateResult } from '../types'
 
 export function AdminPanel() {
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: stats, loading, error: loadError, reload } = useAsyncData(
+    () => api.getStats(),
+    [],
+  )
+
+  const [actionError, setActionError] = useState<string | null>(null)
   const [discountResult, setDiscountResult] = useState<DiscountGenerateResult | null>(null)
   const [generating, setGenerating] = useState(false)
 
-  const loadStats = useCallback(() => {
-    setLoading(true)
-    setError(null)
-    api
-      .getStats()
-      .then(setStats)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
-
-  useEffect(() => {
-    loadStats()
-  }, [loadStats])
+  const error = actionError ?? loadError
 
   const handleGenerate = async () => {
     setGenerating(true)
-    setError(null)
+    setActionError(null)
     setDiscountResult(null)
     try {
       const result = await api.generateDiscount()
       setDiscountResult(result)
-      loadStats()
+      reload()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to generate code')
+      setActionError(e instanceof Error ? e.message : 'Failed to generate code')
     } finally {
       setGenerating(false)
     }
@@ -59,7 +51,7 @@ export function AdminPanel() {
         >
           {generating ? 'Generating…' : 'Generate discount code'}
         </button>
-        <button type="button" className="btn btn-secondary" onClick={loadStats}>
+        <button type="button" className="btn btn-secondary" onClick={reload}>
           Refresh stats
         </button>
       </div>

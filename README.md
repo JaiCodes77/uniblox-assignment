@@ -1,6 +1,6 @@
 # Ecommerce Store API
 
-A small FastAPI + SQLAlchemy backend for an ecommerce store: list a catalog, build a per-user cart, check out into an order, and apply admin-issued discount codes that unlock on every Nth order. SQLite-backed for zero-config local dev; fully covered by pytest.
+A small FastAPI + SQLAlchemy backend for an ecommerce store: list a catalog, build a per-user cart, check out into an order, and apply admin-issued discount codes that unlock on every Nth order. SQLite-backed for zero-config local dev; fully covered by pytest. A minimal React + Vite UI under [`frontend/`](./frontend) is bundled so you can click through the API instead of curling it — see [Frontend](#frontend-optional-ui).
 
 ## Stack
 
@@ -34,6 +34,24 @@ pytest -v
 ```
 
 Tests use an in-memory SQLite engine per test (`StaticPool`) for full isolation — no `store.db` is touched.
+
+## Frontend (optional UI)
+
+A small React 19 + TypeScript + Vite app lives in [`frontend/`](./frontend). It's there purely as a visualizer for the backend — three tabs (Shop / Cart / Admin) that exercise every endpoint, a user-id switcher in the header, and a live status dot that polls `/health`. Useful if you'd rather click through the demo than copy-paste curl.
+
+Run it alongside the backend:
+
+```bash
+# Terminal 1 — backend
+uvicorn app.main:app --reload                 # binds :8000
+
+# Terminal 2 — frontend
+cd frontend
+npm install
+npm run dev                                   # opens on :5173
+```
+
+Vite proxies `/api/*` → `http://localhost:8000`, so the frontend talks to the live API without any CORS setup. There's also `node scripts/verify-api.mjs` inside `frontend/` — a fast Node smoke test that walks the full happy path against a running backend and asserts every response shape, useful as a CI/sanity check.
 
 ## API Overview
 
@@ -127,13 +145,18 @@ curl -s http://localhost:8000/admin/stats | jq
 │       ├── checkout.py       #   Atomic: order + items snapshot + cart clear
 │       ├── discount.py
 │       └── stats.py
-└── tests/
-    ├── conftest.py           # In-memory db + seed_items + make_orders fixtures
-    ├── test_cart.py
-    ├── test_checkout.py
-    ├── test_discount.py
-    ├── test_stats.py
-    └── test_api.py           # FastAPI TestClient integration tests
+├── tests/
+│   ├── conftest.py           # In-memory db + seed_items + make_orders fixtures
+│   ├── test_cart.py
+│   ├── test_checkout.py
+│   ├── test_discount.py
+│   ├── test_stats.py
+│   └── test_api.py           # FastAPI TestClient integration tests
+└── frontend/                 # Optional React + Vite UI to visualize the backend
+    ├── src/                  #   App.tsx, api.ts client, components/, hooks/
+    ├── scripts/
+    │   └── verify-api.mjs    #   Node smoke test against a running backend
+    └── vite.config.ts        #   Dev server proxies /api → localhost:8000
 ```
 
 ## Design Decisions

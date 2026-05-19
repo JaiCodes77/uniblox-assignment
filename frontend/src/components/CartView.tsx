@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../api'
-import type { Cart, Order } from '../types'
+import { useAsyncData } from '../hooks/useAsyncData'
+import type { Order } from '../types'
 
 interface CartViewProps {
   userId: string
@@ -9,50 +10,45 @@ interface CartViewProps {
 }
 
 export function CartView({ userId, refreshKey, onCheckout }: CartViewProps) {
-  const [cart, setCart] = useState<Cart | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const trimmedUser = userId.trim()
+  const enabled = trimmedUser.length > 0
+
+  const { data: cart, loading, error: loadError, reload } = useAsyncData(
+    () => api.getCart(trimmedUser),
+    [trimmedUser, refreshKey],
+    enabled,
+  )
+
+  const [actionError, setActionError] = useState<string | null>(null)
   const [discountCode, setDiscountCode] = useState('')
   const [checkingOut, setCheckingOut] = useState(false)
   const [lastOrder, setLastOrder] = useState<Order | null>(null)
 
-  const loadCart = useCallback(() => {
-    if (!userId.trim()) {
-      setCart(null)
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    setError(null)
-    api
-      .getCart(userId)
-      .then(setCart)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [userId])
-
-  useEffect(() => {
-    loadCart()
-  }, [loadCart, refreshKey])
+  const error = actionError ?? loadError
 
   const handleCheckout = async () => {
+    if (!cart?.items.length) {
+      setActionError('Your cart is empty.')
+      return
+    }
+
     setCheckingOut(true)
-    setError(null)
+    setActionError(null)
     setLastOrder(null)
     try {
-      const order = await api.checkout(userId, discountCode.trim() || undefined)
+      const order = await api.checkout(trimmedUser, discountCode.trim() || undefined)
       setLastOrder(order)
       setDiscountCode('')
       onCheckout()
-      loadCart()
+      reload()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Checkout failed')
+      setActionError(e instanceof Error ? e.message : 'Checkout failed')
     } finally {
       setCheckingOut(false)
     }
   }
 
-  if (!userId.trim()) {
+  if (!enabled) {
     return (
       <section>
         <h2 className="section-title">Cart</h2>
@@ -70,7 +66,7 @@ export function CartView({ userId, refreshKey, onCheckout }: CartViewProps) {
   return (
     <section>
       <h2 className="section-title">Cart</h2>
-      <p className="section-sub">Review items and complete checkout for {userId}.</p>
+      <p className="section-sub">Review items and complete checkout for {trimmedUser}.</p>
 
       {error && <div className="alert alert-error">{error}</div>}
 

@@ -15,15 +15,33 @@ function App() {
   const [backendOk, setBackendOk] = useState<boolean | null>(null)
   const [cartRefresh, setCartRefresh] = useState(0)
 
+  const trimmedUser = userId.trim()
+
   useEffect(() => {
     localStorage.setItem(USER_KEY, userId)
   }, [userId])
 
   useEffect(() => {
-    api
-      .health()
-      .then(() => setBackendOk(true))
-      .catch(() => setBackendOk(false))
+    let active = true
+
+    const checkHealth = () => {
+      void api
+        .health()
+        .then(() => {
+          if (active) setBackendOk(true)
+        })
+        .catch(() => {
+          if (active) setBackendOk(false)
+        })
+    }
+
+    checkHealth()
+    const interval = window.setInterval(checkHealth, 5000)
+
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
   }, [])
 
   const bumpCart = useCallback(() => setCartRefresh((k) => k + 1), [])
@@ -97,9 +115,14 @@ function App() {
         </button>
       </nav>
 
-      {tab === 'shop' && <Catalog userId={userId} onCartChange={bumpCart} />}
+      {tab === 'shop' && <Catalog userId={trimmedUser} onCartChange={bumpCart} />}
       {tab === 'cart' && (
-        <CartView userId={userId} refreshKey={cartRefresh} onCheckout={bumpCart} />
+        <CartView
+          key={`${trimmedUser}-${cartRefresh}`}
+          userId={trimmedUser}
+          refreshKey={cartRefresh}
+          onCheckout={bumpCart}
+        />
       )}
       {tab === 'admin' && <AdminPanel />}
     </div>
