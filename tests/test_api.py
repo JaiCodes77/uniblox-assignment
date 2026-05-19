@@ -157,12 +157,34 @@ def test_admin_discount_generate_not_eligible_initially(client: TestClient) -> N
     assert response.json() == {"eligible": False, "reason": "no orders yet"}
 
 
-def test_admin_stats_placeholder_returns_zeros(client: TestClient) -> None:
+def test_admin_stats_empty_state_returns_zeros(client: TestClient) -> None:
+    """HTTP-layer smoke test for /admin/stats wired through StatsService."""
     response = client.get("/admin/stats")
     assert response.status_code == 200
     assert response.json() == {
         "items_purchased": 0,
         "total_revenue": 0.0,
+        "discount_codes_issued": 0,
+        "total_discount_amount": 0.0,
+    }
+
+
+def test_admin_stats_reflects_completed_order(client: TestClient) -> None:
+    """End-to-end: /cart/add -> /checkout -> /admin/stats reports the order."""
+    client.post(
+        "/cart/add",
+        json={"user_id": "alice", "item_id": TSHIRT_ID, "quantity": 2},
+    )
+    client.post(
+        "/cart/add",
+        json={"user_id": "alice", "item_id": MUG_ID, "quantity": 1},
+    )
+    client.post("/checkout", json={"user_id": "alice"})
+
+    stats = client.get("/admin/stats").json()
+    assert stats == {
+        "items_purchased": 3,
+        "total_revenue": 50.0,
         "discount_codes_issued": 0,
         "total_discount_amount": 0.0,
     }
